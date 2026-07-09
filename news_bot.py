@@ -238,7 +238,6 @@ def build_message(keyword: str, article: dict) -> str:
     return (
         f"<b>{title}</b>\n\n"
         f"{desc}\n\n"
-        f"🔎 {html.escape(keyword)}\n"
         f"📅 {format_kst(article['published'])}\n"
         f"🔗 <a href=\"{article['link']}\">뉴스 전문 보기</a>"
     )
