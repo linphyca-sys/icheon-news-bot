@@ -10,7 +10,7 @@
 | 필터 | `keywords.txt`에서 검색어·포함어·제외어 관리 |
 | 중복 방지 | `seen_links.json`에 본 기사 링크 저장 |
 | 기록 | `articles.csv`에 전송 기사 누적 |
-| 자동 실행 | GitHub Actions 수동 실행 + 10분 주기 schedule |
+| 자동 실행 | GitHub Actions `workflow_dispatch` + cron-job.org 10분 주기 외부 호출 |
 
 ## 파일
 
@@ -65,7 +65,29 @@ NAVER_CLIENT_SECRET=
 | `NAVER_CLIENT_SECRET` | 필수 | 네이버 개발자센터 검색 API Client Secret |
 
 5. 저장소 `Actions > 이천 뉴스봇 > Run workflow`로 1회 수동 실행할 수 있습니다.
-6. 자동 실행은 GitHub Actions schedule로 10분마다 동작합니다.
+6. 자동 실행은 cron-job.org에서 GitHub Actions `workflow_dispatch` API를 10분마다 호출하도록 설정합니다.
+
+## cron-job.org 설정
+
+GitHub 자체 `schedule`은 지연되거나 빠질 수 있으므로 사용하지 않습니다. cron-job.org가 아래 GitHub API를 10분마다 `POST`로 호출하게 설정합니다.
+
+| 항목 | 값 |
+| --- | --- |
+| URL | `https://api.github.com/repos/linphyca-sys/icheon-news-bot/actions/workflows/newsbot.yml/dispatches` |
+| Method | `POST` |
+| Schedule | 10분마다 |
+| Body | `{"ref":"main"}` |
+
+필수 headers:
+
+```text
+Authorization: Bearer <GitHub PAT>
+Accept: application/vnd.github+json
+User-Agent: icheon-news-bot-cron
+Content-Type: application/json
+```
+
+GitHub PAT는 fine-grained token으로 만들고, 저장소는 `linphyca-sys/icheon-news-bot`만 선택합니다. 권한은 `Actions: Read and write`만 부여합니다.
 
 ## Token 보안
 
@@ -97,7 +119,7 @@ Telegram bot token은 해당 봇을 제어할 수 있는 비밀값입니다. 대
 
 ## 운영 기준
 
-- 검색 간격은 GitHub Actions schedule 기준 10분입니다.
+- 검색 간격은 cron-job.org 기준 10분입니다.
 - 속보성이 중요하면 `MAX_AGE_HOURS=12`로 줄입니다.
 - 누락 방지가 중요하면 `MAX_AGE_HOURS=48`로 늘립니다.
 - 기사량이 많으면 `MAX_PER_KEYWORD=1` 또는 `2`로 줄입니다.
