@@ -132,6 +132,27 @@ def clean_text(s: str) -> str:
     return s.strip()
 
 
+MEDIA_SUFFIX_EXACTS = {
+    "중부일보", "경기일보", "경인일보", "인천일보", "기호일보", "중부매일",
+    "한국경제", "서울경제", "매일경제", "헤럴드경제", "이데일리", "뉴시스",
+    "뉴스1", "연합뉴스", "프레시안", "오마이뉴스",
+}
+
+MEDIA_SUFFIX_HINTS = (
+    "뉴스", "일보", "신문", "투데이", "데일리", "타임즈", "저널", "매일",
+    "방송", "tv", "프레스", "헤럴드", "미디어", "포스트", "리포트", "매거진",
+)
+
+
+def looks_like_media_suffix(text: str) -> bool:
+    compact = re.sub(r"\s+", "", clean_text(text)).lower()
+    if not 2 <= len(compact) <= 30:
+        return False
+    if compact in {name.lower() for name in MEDIA_SUFFIX_EXACTS}:
+        return True
+    return any(hint in compact for hint in MEDIA_SUFFIX_HINTS)
+
+
 def _og_meta(head: str, prop: str):
     for pattern in (
         re.compile(rf'<meta[^>]+property=["\']og:{prop}["\'][^>]+content=(["\'])(?P<v>.*?)\1', re.I),
@@ -146,10 +167,14 @@ def _og_meta(head: str, prop: str):
 
 
 def strip_site_name(title: str, site_name) -> str:
-    if not site_name:
-        return title
+    title = clean_text(title)
     m = re.match(r"^(.*\S)\s*[|\-–—:]\s*(.+?)$", title)
-    if m and m.group(2).strip().lower() == site_name.strip().lower():
+    if not m:
+        return title
+    suffix = clean_text(m.group(2))
+    if site_name and suffix.lower() == clean_text(site_name).lower():
+        return m.group(1).strip(" |-–—:")
+    if re.search(r"\s[|\-–—]\s", title) and looks_like_media_suffix(suffix):
         return m.group(1).strip(" |-–—:")
     return title
 
@@ -215,7 +240,7 @@ def search_naver(keyword: str, cutoff=None) -> list:
             except (KeyError, ValueError, TypeError):
                 pub = datetime.now(KST)
             page_articles.append({
-                "title": clean_text(item.get("title")),
+                "title": strip_site_name(item.get("title"), None),
                 "description": clean_text(item.get("description")),
                 "link": item.get("originallink") or item.get("link"),
                 "naver_link": item.get("link"),
