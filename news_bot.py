@@ -80,7 +80,7 @@ MAX_PER_KEYWORD = int(os.getenv("MAX_PER_KEYWORD", "0"))
 FIRST_RUN_SEND = int(os.getenv("FIRST_RUN_SEND", "0"))
 MAX_AGE_HOURS = float(os.getenv("MAX_AGE_HOURS", "6"))
 NAVER_DISPLAY = 100
-NAVER_MAX_START = int(os.getenv("NAVER_MAX_START", "1000"))
+NAVER_MAX_START = int(os.getenv("NAVER_MAX_START", "100"))
 
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "").strip()
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "").strip()
