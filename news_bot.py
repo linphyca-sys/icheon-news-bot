@@ -79,6 +79,8 @@ INTERVAL_MINUTES = float(os.getenv("INTERVAL_MINUTES", "10"))
 MAX_PER_KEYWORD = int(os.getenv("MAX_PER_KEYWORD", "0"))
 FIRST_RUN_SEND = int(os.getenv("FIRST_RUN_SEND", "1"))
 MAX_AGE_HOURS = float(os.getenv("MAX_AGE_HOURS", "36"))
+NAVER_DISPLAY = 100
+NAVER_MAX_START = int(os.getenv("NAVER_MAX_START", "1000"))
 
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "").strip()
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "").strip()
@@ -193,35 +195,42 @@ def fetch_full_title(article: dict):
     return None
 
 
-def search_naver(keyword: str) -> list:
-    resp = requests.get(
-        "https://openapi.naver.com/v1/search/news.json",
-        params={"query": keyword, "display": 100, "sort": "date"},
-        headers={
-            "X-Naver-Client-Id": NAVER_CLIENT_ID,
-            "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
-        },
-        timeout=15,
-    )
-    resp.raise_for_status()
+def search_naver(keyword: str, cutoff=None) -> list:
     articles = []
-    for item in resp.json().get("items", []):
-        try:
-            pub = parsedate_to_datetime(item["pubDate"]).astimezone(KST)
-        except (KeyError, ValueError, TypeError):
-            pub = datetime.now(KST)
-        articles.append({
-            "title": clean_text(item.get("title")),
-            "description": clean_text(item.get("description")),
-            "link": item.get("originallink") or item.get("link"),
-            "naver_link": item.get("link"),
-            "published": pub,
-        })
+    for start in range(1, NAVER_MAX_START + 1, NAVER_DISPLAY):
+        resp = requests.get(
+            "https://openapi.naver.com/v1/search/news.json",
+            params={"query": keyword, "display": NAVER_DISPLAY, "sort": "date", "start": start},
+            headers={
+                "X-Naver-Client-Id": NAVER_CLIENT_ID,
+                "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        page_articles = []
+        for item in resp.json().get("items", []):
+            try:
+                pub = parsedate_to_datetime(item["pubDate"]).astimezone(KST)
+            except (KeyError, ValueError, TypeError):
+                pub = datetime.now(KST)
+            page_articles.append({
+                "title": clean_text(item.get("title")),
+                "description": clean_text(item.get("description")),
+                "link": item.get("originallink") or item.get("link"),
+                "naver_link": item.get("link"),
+                "published": pub,
+            })
+        articles.extend(page_articles)
+        if len(page_articles) < NAVER_DISPLAY:
+            break
+        if cutoff and page_articles and page_articles[-1]["published"] < cutoff:
+            break
     return articles
 
 
-def search_news(keyword: str) -> list:
-    return search_naver(keyword)
+def search_news(keyword: str, cutoff=None) -> list:
+    return search_naver(keyword, cutoff)
 
 
 def format_kst(dt: datetime) -> str:
@@ -273,15 +282,21 @@ def send_telegram(text: str) -> bool:
 def check_once(seen: dict, first_run: bool) -> None:
     now = datetime.now(KST).strftime("%H:%M:%S")
     for kw in KEYWORDS:
+        cutoff = datetime.now(KST) - timedelta(hours=MAX_AGE_HOURS)
         try:
-            articles = search_news(kw["query"])
+            articles = search_news(kw["query"], cutoff)
         except Exception as e:
             print(f"[{now}] '{kw['query']}' 검색 실패: {e}")
             continue
 
-        fresh = [a for a in articles if a["link"] and a["link"] not in seen]
+        fresh = []
+        fresh_links = set()
+        for article in articles:
+            link = article["link"]
+            if link and link not in seen and link not in fresh_links:
+                fresh.append(article)
+                fresh_links.add(link)
         matched = [a for a in fresh if passes_filter(a, kw)]
-        cutoff = datetime.now(KST) - timedelta(hours=MAX_AGE_HOURS)
         recent = [a for a in matched if a["published"] >= cutoff]
         if first_run:
             limit = FIRST_RUN_SEND

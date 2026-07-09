@@ -34,6 +34,7 @@ jobs:
           MAX_PER_KEYWORD: "0"
           FIRST_RUN_SEND: "1"
           MAX_AGE_HOURS: "36"
+          NAVER_MAX_START: "1000"
         run: python news_bot.py --once
 
       - name: 전송 기록 저장

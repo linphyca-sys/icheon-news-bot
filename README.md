@@ -8,6 +8,7 @@
 | --- | --- |
 | 수집 | 네이버 뉴스 검색 API 전용 |
 | 필터 | `keywords.txt`에서 검색어·포함어·제외어 관리 |
+| 검색 깊이 | 키워드별 최신순 최대 1,000건까지 페이지네이션 |
 | 중복 방지 | `seen_links.json`에 본 기사 링크 저장 |
 | 기록 | `articles.csv`에 전송 기사 누적 |
 | 자동 실행 | GitHub Actions `workflow_dispatch` + cron-job.org 10분 주기 외부 호출 |
@@ -120,6 +121,7 @@ Telegram bot token은 해당 봇을 제어할 수 있는 비밀값입니다. 대
 ## 운영 기준
 
 - 검색 간격은 cron-job.org 기준 10분입니다.
+- 네이버 API는 한 번에 최대 100건을 반환하므로, 봇은 `start=1,101,201...901` 방식으로 키워드별 최대 1,000건까지 확인합니다.
 - 속보성이 중요하면 `MAX_AGE_HOURS=12`로 줄입니다.
 - 누락 방지가 중요하면 `MAX_AGE_HOURS=48`로 늘립니다.
 - 기사량이 많으면 `MAX_PER_KEYWORD=1` 또는 `2`로 줄입니다.
