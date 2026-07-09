@@ -1,0 +1,52 @@
+name: 이천 뉴스봇
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: icheon-newsbot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  check-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성 설치
+        run: pip install -q -r requirements.txt
+
+      - name: 뉴스 확인 및 전송
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          MAX_PER_KEYWORD: "3"
+          FIRST_RUN_SEND: "2"
+          MAX_AGE_HOURS: "36"
+        run: python news_bot.py --once
+
+      - name: 전송 기록 저장
+        run: |
+          git config user.name "news-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add seen_links.json
+          if [ -f articles.csv ]; then git add articles.csv; fi
+          git diff --cached --quiet && exit 0
+          git commit -m "기사 전송 기록 갱신"
+          for i in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          echo "기록 저장 실패, 다음 실행에서 자동 반영됨"
+          exit 0
