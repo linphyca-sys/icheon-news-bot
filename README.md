@@ -1,16 +1,16 @@
 # 이천 뉴스봇
 
-이천시 전체 현안을 네이버 뉴스 API 또는 Google News RSS로 검색해 새 기사만 텔레그램 채널로 전송하는 봇입니다. 기본 설정은 누락을 줄이기 위해 `이천시`, `경기 이천`, `경기도 이천`을 함께 검색하고, 폭우·침수·화재·교통사고 같은 생활 속보 키워드를 보강합니다.
+이천시 전체 현안을 네이버 뉴스 검색 API로 검색해 새 기사만 텔레그램 채널로 전송하는 봇입니다. 기본 설정은 누락을 줄이기 위해 `이천시`, `경기 이천`, `경기도 이천`을 함께 검색하고, 폭우·침수·화재·교통사고 같은 생활 속보 키워드를 보강합니다.
 
 ## 핵심 구조
 
 | 항목 | 내용 |
 | --- | --- |
-| 수집 | 네이버 뉴스 검색 API 우선, API 키가 없으면 Google News RSS 사용 |
+| 수집 | 네이버 뉴스 검색 API 전용 |
 | 필터 | `keywords.txt`에서 검색어·포함어·제외어 관리 |
 | 중복 방지 | `seen_links.json`에 본 기사 링크 저장 |
 | 기록 | `articles.csv`에 전송 기사 누적 |
-| 자동 실행 | GitHub Actions `workflow_dispatch` + cron-job.org 외부 호출 권장 |
+| 자동 실행 | GitHub Actions 수동 실행 + 10분 주기 schedule |
 
 ## 파일
 
@@ -42,7 +42,7 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 ```
 
-네이버 뉴스 검색 API를 쓰려면 아래 값도 넣습니다. 없으면 Google News RSS로 동작합니다.
+네이버 뉴스 검색 API를 사용하므로 아래 값이 필수입니다.
 
 ```env
 NAVER_CLIENT_ID=
@@ -61,11 +61,11 @@ NAVER_CLIENT_SECRET=
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | 필수 | BotFather에서 받은 봇 토큰 |
 | `TELEGRAM_CHAT_ID` | 필수 | 텔레그램 채널 또는 개인 chat_id |
-| `NAVER_CLIENT_ID` | 권장 | 네이버 개발자센터 검색 API Client ID |
-| `NAVER_CLIENT_SECRET` | 권장 | 네이버 개발자센터 검색 API Client Secret |
+| `NAVER_CLIENT_ID` | 필수 | 네이버 개발자센터 검색 API Client ID |
+| `NAVER_CLIENT_SECRET` | 필수 | 네이버 개발자센터 검색 API Client Secret |
 
-5. 저장소 `Actions > 이천 뉴스봇 > Run workflow`로 1회 실행합니다.
-6. 1시간마다 실행하려면 cron-job.org에서 GitHub Actions `workflow_dispatch` API를 호출하도록 설정합니다.
+5. 저장소 `Actions > 이천 뉴스봇 > Run workflow`로 1회 수동 실행할 수 있습니다.
+6. 자동 실행은 GitHub Actions schedule로 10분마다 동작합니다.
 
 ## Token 보안
 
@@ -99,7 +99,8 @@ Telegram bot token은 해당 봇을 제어할 수 있는 비밀값입니다. 대
 
 ## 운영 기준
 
+- 검색 간격은 GitHub Actions schedule 기준 10분입니다.
 - 속보성이 중요하면 `MAX_AGE_HOURS=12`로 줄입니다.
 - 누락 방지가 중요하면 `MAX_AGE_HOURS=48`로 늘립니다.
 - 기사량이 많으면 `MAX_PER_KEYWORD=1` 또는 `2`로 줄입니다.
-- 이천시 전체 모니터링은 네이버 API 사용을 권장합니다. Google News RSS는 무료이지만 검색 결과 수와 정렬이 더 불안정할 수 있습니다.
+- 이천시 전체 모니터링은 네이버 뉴스 검색 API 기준으로만 운영합니다.

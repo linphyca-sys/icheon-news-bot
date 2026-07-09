@@ -2,6 +2,8 @@ name: 이천 뉴스봇
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
 
 concurrency:
   group: icheon-newsbot
@@ -30,8 +32,9 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
-          MAX_PER_KEYWORD: "3"
-          FIRST_RUN_SEND: "2"
+          INTERVAL_MINUTES: "10"
+          MAX_PER_KEYWORD: "0"
+          FIRST_RUN_SEND: "1"
           MAX_AGE_HOURS: "36"
         run: python news_bot.py --once
 
@@ -39,7 +42,7 @@ jobs:
         run: |
           git config user.name "news-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add seen_links.json
+          if [ -f seen_links.json ]; then git add seen_links.json; fi
           if [ -f articles.csv ]; then git add articles.csv; fi
           git diff --cached --quiet && exit 0
           git commit -m "기사 전송 기록 갱신"

@@ -2,7 +2,7 @@
 """
 이천 뉴스봇
 - 설정한 키워드로 이천시 관련 뉴스를 주기적으로 검색해서 새 기사만 텔레그램으로 전송
-- 뉴스 소스: 네이버 뉴스 검색 API (키가 있으면) / Google News RSS (키가 없으면)
+- 뉴스 소스: 네이버 뉴스 검색 API
 """
 
 import csv
@@ -75,14 +75,13 @@ def passes_filter(article: dict, kw: dict) -> bool:
     return True
 
 
-INTERVAL_MINUTES = float(os.getenv("INTERVAL_MINUTES", "60"))
-MAX_PER_KEYWORD = int(os.getenv("MAX_PER_KEYWORD", "3"))
-FIRST_RUN_SEND = int(os.getenv("FIRST_RUN_SEND", "2"))
+INTERVAL_MINUTES = float(os.getenv("INTERVAL_MINUTES", "10"))
+MAX_PER_KEYWORD = int(os.getenv("MAX_PER_KEYWORD", "0"))
+FIRST_RUN_SEND = int(os.getenv("FIRST_RUN_SEND", "1"))
 MAX_AGE_HOURS = float(os.getenv("MAX_AGE_HOURS", "36"))
 
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "").strip()
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "").strip()
-USE_NAVER = bool(NAVER_CLIENT_ID and NAVER_CLIENT_SECRET)
 
 SEEN_FILE = BASE_DIR / "seen_links.json"
 CSV_FILE = BASE_DIR / "articles.csv"
@@ -221,34 +220,8 @@ def search_naver(keyword: str) -> list:
     return articles
 
 
-def search_google_rss(keyword: str) -> list:
-    import feedparser
-
-    url = (
-        "https://news.google.com/rss/search"
-        f"?q={requests.utils.quote(keyword)}&hl=ko&gl=KR&ceid=KR:ko"
-    )
-    feed = feedparser.parse(url)
-    articles = []
-    for entry in feed.entries[:20]:
-        if getattr(entry, "published_parsed", None):
-            pub = datetime.fromtimestamp(
-                time.mktime(entry.published_parsed), tz=timezone.utc
-            ).astimezone(KST)
-        else:
-            pub = datetime.now(KST)
-        articles.append({
-            "title": clean_text(entry.get("title", "")),
-            "description": clean_text(entry.get("summary", ""))[:200],
-            "link": entry.get("link", ""),
-            "published": pub,
-        })
-    articles.sort(key=lambda a: a["published"], reverse=True)
-    return articles
-
-
 def search_news(keyword: str) -> list:
-    return search_naver(keyword) if USE_NAVER else search_google_rss(keyword)
+    return search_naver(keyword)
 
 
 def format_kst(dt: datetime) -> str:
@@ -341,11 +314,13 @@ def check_once(seen: dict, first_run: bool) -> None:
 def main() -> None:
     if not BOT_TOKEN or not CHAT_ID:
         sys.exit("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID를 .env에 설정하세요. README 참고")
+    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
+        sys.exit("NAVER_CLIENT_ID / NAVER_CLIENT_SECRET을 .env 또는 GitHub Secrets에 설정하세요.")
     if not KEYWORDS:
         sys.exit("KEYWORDS를 .env 또는 keywords.txt에 설정하세요.")
 
     once = "--once" in sys.argv
-    source = "네이버 뉴스 API" if USE_NAVER else "Google News RSS"
+    source = "네이버 뉴스 API"
     mode = "1회 실행" if once else f"{INTERVAL_MINUTES}분 주기"
     kw_names = [k["query"] for k in KEYWORDS]
     print(f"{BOT_NAME} 시작 - 소스: {source}, 키워드: {kw_names}, 모드: {mode}")
