@@ -77,7 +77,7 @@ def passes_filter(article: dict, kw: dict) -> bool:
 
 INTERVAL_MINUTES = float(os.getenv("INTERVAL_MINUTES", "10"))
 MAX_PER_KEYWORD = int(os.getenv("MAX_PER_KEYWORD", "0"))
-FIRST_RUN_SEND = int(os.getenv("FIRST_RUN_SEND", "1"))
+FIRST_RUN_SEND = int(os.getenv("FIRST_RUN_SEND", "0"))
 MAX_AGE_HOURS = float(os.getenv("MAX_AGE_HOURS", "36"))
 NAVER_DISPLAY = 100
 NAVER_MAX_START = int(os.getenv("NAVER_MAX_START", "1000"))
@@ -299,7 +299,7 @@ def check_once(seen: dict, first_run: bool) -> None:
         matched = [a for a in fresh if passes_filter(a, kw)]
         recent = [a for a in matched if a["published"] >= cutoff]
         if first_run:
-            limit = FIRST_RUN_SEND
+            limit = FIRST_RUN_SEND if FIRST_RUN_SEND > 0 else None
         else:
             limit = MAX_PER_KEYWORD if MAX_PER_KEYWORD > 0 else None
         to_send = recent[:limit]
