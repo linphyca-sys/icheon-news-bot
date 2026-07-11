@@ -6,6 +6,7 @@
 """
 
 import csv
+import hashlib
 import html
 import json
 import os
@@ -179,6 +180,35 @@ def strip_site_name(title: str, site_name) -> str:
     return title
 
 
+def duplicate_title_key(title: str) -> str | None:
+    normalized = re.sub(r"[^\w가-힣]", "", strip_site_name(title, None).lower())
+    if len(normalized) < 12:
+        return None
+    digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()
+    return f"title:{digest}"
+
+
+def backfill_seen_title_keys(seen: dict) -> bool:
+    if not CSV_FILE.exists():
+        return False
+    changed = False
+    stamp = time.time()
+    try:
+        with CSV_FILE.open(encoding="utf-8-sig", newline="") as f:
+            reader = csv.reader(f)
+            next(reader, None)
+            for row in reader:
+                if len(row) < 4:
+                    continue
+                title_key = duplicate_title_key(row[3])
+                if title_key and title_key not in seen:
+                    seen[title_key] = stamp
+                    changed = True
+    except OSError:
+        return False
+    return changed
+
+
 BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -315,12 +345,14 @@ def check_once(seen: dict, first_run: bool) -> None:
             continue
 
         fresh = []
-        fresh_links = set()
+        fresh_seen_keys = set()
         for article in articles:
             link = article["link"]
-            if link and link not in seen and link not in fresh_links:
+            title_key = duplicate_title_key(article["title"])
+            article_seen_keys = [k for k in (link, title_key) if k]
+            if article_seen_keys and not any(k in seen or k in fresh_seen_keys for k in article_seen_keys):
                 fresh.append(article)
-                fresh_links.add(link)
+                fresh_seen_keys.update(article_seen_keys)
         matched = [a for a in fresh if passes_filter(a, kw)]
         recent = [a for a in matched if a["published"] >= cutoff]
         if first_run:
@@ -331,7 +363,9 @@ def check_once(seen: dict, first_run: bool) -> None:
 
         stamp = time.time()
         for a in fresh:
-            seen[a["link"]] = stamp
+            for seen_key in (a["link"], duplicate_title_key(a["title"])):
+                if seen_key:
+                    seen[seen_key] = stamp
 
         filtered_out = len(fresh) - len(matched)
         too_old = len(matched) - len(recent)
@@ -365,6 +399,8 @@ def main() -> None:
     print(f"{BOT_NAME} 시작 - 소스: {source}, 키워드: {kw_names}, 모드: {mode}")
 
     seen = load_seen()
+    if backfill_seen_title_keys(seen):
+        save_seen(seen)
     first_run = not seen
 
     if once:
